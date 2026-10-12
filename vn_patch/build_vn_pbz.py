@@ -15,6 +15,7 @@ import argparse, binascii, contextlib, io, json, os, struct, sys, time, zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pbfmerge import Pbf, decode_glyph, encode_glyph  # noqa: E402
+import hook_style  # noqa: E402
 
 FIRMWARE, RESPACK = "tintin_fw.bin", "system_resources.pbpack"
 LANG_BASE = 0x100C                    # language packs: 256-entry table, not the system pack's 512
@@ -222,6 +223,9 @@ def main():
                     help="bytes of the resource bank to leave free when fitting optional glyphs (default 1024)")
     ap.add_argument("--skip-large", action="append", default=[], choices=["09", "36", "36b"],
                     help="leave this Gothic font alone to save space (repeatable), e.g. --skip-large 36")
+    ap.add_argument("--only-codepoints", default="",
+                    help="comma-separated hex codepoints: merge only these glyphs from the language pack into the "
+                         "14-28px fonts (for devices that get the rest from the pack, e.g. Pebble 2: 110,111,1A0,1A1,1AF,1B0)")
     ap.add_argument("--no-large", action="store_true", help="do not add glyphs to the Gothic 09/36/36 bold fonts")
     ap.add_argument("pbzin"); ap.add_argument("pbzout")
     a = ap.parse_args()
@@ -246,19 +250,27 @@ def main():
     if sorted({e.max_height for e in plan.values()}) != list(SIZES) or len(plan) != 8:
         sys.exit("expected 8 fonts at sizes %s, got %d" % (SIZES, len(plan)))
 
+    only = {int(c, 16) for c in a.only_codepoints.split(",") if c.strip()} or None
     for j, ext in sorted(plan.items()):
         base = Pbf(sys_res[j])
-        added, replaced = base.merge(ext, PREFER_PACK)
-        fixed = repair_dot_below_y(base)
-        repair_hook_i(base)
+        if only:
+            added, replaced = base.merge(ext, PREFER_PACK & only, only=only)
+            fixed, restyled = False, 0
+        else:
+            added, replaced = base.merge(ext, PREFER_PACK)
+            fixed = repair_dot_below_y(base)
+            repair_hook_i(base)
+            changes = hook_style.restyle(base)
+            base.glyphs.update(changes)
+            restyled = len(changes)
         out = base.serialize()
         assert Pbf(out).glyphs.keys() == base.glyphs.keys()
-        print("system resource %3d (h%2d): +%d glyphs, %d replaced%s, %d -> %d bytes"
+        print("system resource %3d (h%2d): +%d glyphs, %d replaced%s%s, %d -> %d bytes"
               % (j + 1, base.max_height, added, replaced, ", U+1EF5 repaired" if fixed else "",
-                 len(sys_res[j]), len(out)))
+                 ", %d hooks restyled" % restyled if restyled else "", len(sys_res[j]), len(out)))
         sys_res[j] = out
 
-    info = {"vietnamese_14_28": True, "large_fonts": [], "skipped_large_fonts": [], "symbols": [], "emoji": [],
+    info = {"vietnamese_14_28": True, "only_codepoints": sorted(only) if only else None, "large_fonts": [], "skipped_large_fonts": [], "symbols": [], "emoji": [],
             "skipped_emoji": []}
     limit = BANK_SIZE - a.margin
 

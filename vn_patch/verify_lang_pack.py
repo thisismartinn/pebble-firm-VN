@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pbfmerge import Pbf, decode_glyph
 from verify_pbz import lookup, VN
 from build_lang_pack import read_pack, BASE
+import hook_style
 
 
 def main():
@@ -43,7 +44,15 @@ def main():
             y, _ = decode_glyph(lookup(new[i], 0x1EF5))
             check(sum(1 for _ in y) > 8, "slot %d: U+1EF5 has a full body" % (i + 1))
             diff = [cp for cp in n.glyphs if n.glyphs[cp] != o.glyphs.get(cp)]
-            check(set(diff) <= {0x1EF5, 0x128}, "slot %d: only U+1EF5 / U+0128 differ (%s)" % (i + 1, [hex(c) for c in diff]))
+            allowed = {0x1EF5, 0x128} | set(hook_style.HOOK_GLYPHS) | set(hook_style.I_HOOK)
+            check(set(diff) <= allowed, "slot %d: only U+1EF5, U+0128 and the hook glyphs differ" % (i + 1))
+            bad = []
+            for cp in hook_style.HOOK_GLYPHS:
+                if cp in n.glyphs:
+                    px, _ = decode_glyph(n.glyphs[cp])
+                    top = min(y for _, y in px); bar = max(x for x, y in px if y == top)
+                    bad += [chr(cp)] if any(y == top + 1 and x > bar for x, y in px) else []
+            check(not bad, "slot %d: no pixel sticks out of any hook%s" % (i + 1, " (%s)" % "".join(bad) if bad else ""))
     for slot in (10, 11):
         n = Pbf(new[slot - 1])
         need = [c for c in VN if ord(c) > 0x2AF]            # the extension is only used above U+02AF

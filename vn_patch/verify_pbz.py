@@ -72,6 +72,9 @@ def main():
             check(zs.read(name) == zb.read(name), "%s unchanged" % name)
 
     from build_vn_pbz import read_emoji_list
+    import hook_style
+    partial = info.get("only_codepoints")
+    vn_chars = [chr(c) for c in partial] if partial else list(VN)
     groups, names = read_emoji_list(a.emoji_list)
     groups["emoji"] = info.get("emoji_codepoints", [])           # what this build actually kept
     groups["symbol"] = groups["symbol"] if info["symbols"] else []
@@ -86,23 +89,28 @@ def main():
             continue
         if d[1] in (14, 18, 24, 28):
             check(all(lookup(d, c) is not None for c in groups["symbol"]), "resource %d: coffee/symbol glyphs resolve" % rid)
-        missing = [c for c in VN if lookup(d, ord(c)) is None]
+        missing = [c for c in vn_chars if lookup(d, ord(c)) is None]
         kept = all(lookup(d, c) is not None for c in range(0x20, 0x7F))
         lost = [cp for cp in list(range(0x10000)) + list(range(0x1F300, 0x1F700))
                 if lookup(o, cp) is not None and lookup(d, cp) is None]
-        if d[1] in (14, 18, 24, 28):
+        if d[1] in (14, 18, 24, 28) and not partial:
             check(lookup(d, 0x128) == lookup(o, 0x128), "resource %d: Ĩ is the stock glyph (complete tilde)" % rid)
-        if d[1] in (14, 18, 24, 28):
+            for cp in hook_style.HOOK_GLYPHS:
+                px, _ = decode_glyph(lookup(d, cp))
+                top = min(y for _, y in px); bar = max(x for x, y in px if y == top)
+                check(not any(y == top + 1 and x > bar for x, y in px), "resource %d: %s has no pixel sticking out of its hook" % (rid, chr(cp)))
+        if d[1] in (14, 18, 24, 28) and not partial:
             for cp, stem in ((0x1EC9, 0x131), (0x1EC8, ord("I"))):
                 sp, _ = decode_glyph(lookup(d, stem)); gp, _ = decode_glyph(lookup(d, cp))
                 top = min(y for _, y in sp)
                 body = {p for p in gp if p[1] >= top}
                 ext = lambda px: (min(x for x, _ in px), max(x for x, _ in px))
                 check(ext(body) == ext(sp), "resource %d: %s has the same stem as its base letter" % (rid, chr(cp)))
-        y, _ = decode_glyph(lookup(d, ord("y"))); dy, _ = decode_glyph(lookup(d, 0x1EF5))
-        check(y <= dy, "resource %d: U+1EF5 contains the full letter y" % rid)
+        if not partial:
+            y, _ = decode_glyph(lookup(d, ord("y"))); dy, _ = decode_glyph(lookup(d, 0x1EF5))
+            check(y <= dy, "resource %d: U+1EF5 contains the full letter y" % rid)
         check(not missing and kept and not lost,
-              "resource %d (h%d): all %d Vietnamese chars resolve, nothing lost" % (rid, d[1], len(VN)))
+              "resource %d (h%d): all %d Vietnamese chars resolve, nothing lost" % (rid, d[1], len(vn_chars)))
     print("\nALL CHECKS PASSED" if ok else "\nFAILURES")
     sys.exit(0 if ok else 1)
 

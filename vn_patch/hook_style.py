@@ -50,13 +50,26 @@ def reference_hook(font, upper=False):
     return {(x - x0, y - y0) for x, y in hook}
 
 
-def restyle(font, i_option="A", upper_i_shift=1):
+def _component(px, seed):
+    """8-connected component of `px` containing `seed`."""
+    comp, todo = set(), [seed]
+    while todo:
+        p = todo.pop()
+        if p in comp or p not in px:
+            continue
+        comp.add(p)
+        todo += [(p[0] + dx, p[1] + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)]
+    return comp
+
+
+def restyle(font, upper_i_shift=1):
     """-> {codepoint: record} for the glyphs whose hook changes.
 
-    * every hook-above glyph loses the pixel sticking out right of the top bar,
-    * ỉ (i_option "A"): the two pixels at the left ends of the old hook's top and bottom rows are removed;
-      (i_option "B": the revised hook, centred on the stem),
-    * Ỉ: the revised hook, centred on the stem and then moved `upper_i_shift` pixels to the right.
+    * every hook-above glyph loses the pixel(s) sticking out right of the top bar,
+    * ỉ: the two pixels at the left ends of the old hook's top and bottom rows are removed,
+    * Ỉ: the font's own revised hook (as drawn above ả), centred on the stem, bottom row where the old
+      hook's bottom row was, then moved `upper_i_shift` pixels to the right.
+    Needs the font to contain a, ả, ı, I and the hook glyphs.
     """
     out = {}
     for cp in HOOK_GLYPHS:
@@ -70,18 +83,19 @@ def restyle(font, i_option="A", upper_i_shift=1):
         sp, sadv = decode_glyph(font.glyphs[stem])
         gp, gadv = decode_glyph(font.glyphs[cp])
         top = min(y for _, y in sp)
-        hook = {p for p in gp if p[1] < top}
-        if cp == 0x1EC9 and i_option == "A":
-            hy, hb = min(y for _, y in hook), max(y for _, y in hook)
+        above = {p for p in gp if p[1] < top}
+        hy = min(y for _, y in above)
+        hook = _component(above, min((p for p in above if p[1] == hy)))   # the hook, not a taller stem top
+        hb = max(y for _, y in hook)
+        if cp == 0x1EC9:
             drop = {(min(x for x, y in hook if y == hy), hy), (min(x for x, y in hook if y == hb), hb)}
             out[cp] = encode_glyph(gp - drop, gadv)
             continue
-        mark = revised(hook)
-        x0, y0 = min(x for x, _ in mark), min(y for _, y in mark)
-        mark = {(x - x0, y - y0) for x, y in mark}
-        centre = (min(x for x, _ in sp) + max(x for x, _ in sp)) // 2
+        mark = reference_hook(font)
+        mh = max(y for _, y in mark) + 1
         bar_w = max(x for x, y in mark if y == 0) + 1
-        left = centre - bar_w // 2 + (upper_i_shift if cp == 0x1EC8 else 0)
-        px = sp | shift(mark, left, min(y for _, y in hook))
+        centre = (min(x for x, _ in sp) + max(x for x, _ in sp)) // 2
+        left = centre - bar_w // 2 + upper_i_shift
+        px = (gp - above) | shift(mark, left, hb - (mh - 1))
         out[cp] = encode_glyph(px, max(sadv, gadv, max(x for x, _ in px) + 1))
     return out
