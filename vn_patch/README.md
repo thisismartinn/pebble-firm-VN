@@ -120,3 +120,5 @@ python3 build_lang_pack.py --patcher-dir legacy-firmware-patcher --pbl vi_VN_v16
 ```
 
 `hook_style.py` holds the revised hook-above style (see its docstring); both builders apply it.
+
+At 28px (regular and bold) `capital_marks.py` re-places the grave/acute/tilde on capital Â Ă Ê Ô (up-right of the circumflex apex with a gap row, tilde/breve combos centred) and `hook_shape.py` redraws the hook-above as a "?" with a blank row between it and any circumflex/breve below. Capitals with a circumflex/breve get a 3-row "?" because a 4-row one plus the gap would rise above the top row. Both builders apply it to 28px fonts only.

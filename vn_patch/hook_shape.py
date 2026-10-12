@@ -27,6 +27,12 @@ BASE = {0x1EA3: 0x61, 0x1EA2: 0x41, 0x1EA9: 0xE2, 0x1EA8: 0xC2, 0x1EB3: 0x103, 0
         0x1EED: 0x1B0, 0x1EEC: 0x1AF, 0x1EF7: 0x79, 0x1EF6: 0x59}
 
 
+# Capitals with a circumflex / breve have no room for a gap plus the 4-row mark inside the font's top row, so
+# they get this 3-row version (no tail) instead.
+SHAPES3 = {1: bitmap([".##.", "#..#", "..#."]),
+           2: bitmap([".###.", "##.##", "...##"])}
+
+
 def bb(px):
     xs, ys = [p[0] for p in px], [p[1] for p in px]
     return min(xs), min(ys), max(xs), max(ys)
@@ -36,7 +42,7 @@ def shift(px, dx, dy):
     return {(x + dx, y + dy) for x, y in px}
 
 
-def replace_hooks(font, shape):
+def replace_hooks(font, shape, shape3=None):
     """-> {codepoint: record} with the new "?" in every hook-above glyph (including ỉ / Ỉ).  The new mark keeps
     the horizontal centre and the bottom row of the old one."""
     out = {}
@@ -51,9 +57,14 @@ def replace_hooks(font, shape):
         left = (ox0 + ox1) // 2 - (sx1 - sx0) // 2
         new = shift(shape, left - sx0, oy1 - sy1)
         # on a circumflex / breve the hook must not touch the mark below it: keep one blank row between them
-        while any((x + dx, y + 1) in base for x, y in new for dx in (-1, 0, 1)) or \
-                any((x, y) in base for x, y in new):
-            new = shift(new, 0, -1)
+        def settle(new):
+            while any((x + dx, y + 1) in base for x, y in new for dx in (-1, 0, 1)) or \
+                    any((x, y) in base for x, y in new):
+                new = shift(new, 0, -1)
+            return new
+        new = settle(new)
+        if shape3 and min(y for _, y in new) < 0:            # would stick out above the top row
+            new = settle(shift(shape3, left - bb(shape3)[0], oy1 - bb(shape3)[3]))
         out[cp] = encode_glyph(base | new, adv)
     for cp, stem in H.I_HOOK.items():
         sp, sadv = decode_glyph(font.glyphs[stem]); gp, gadv = decode_glyph(font.glyphs[cp])
@@ -68,3 +79,44 @@ def replace_hooks(font, shape):
         new = shift(shape, centre - (sx1 - sx0) // 2 - sx0, hy1 - sy1)
         out[cp] = encode_glyph((gp - hook) | new, max(sadv, gadv, bb(new)[2] + 1))
     return out
+
+
+NEEDED = sorted({ord("A"), ord("H"), 0xC0, 0xC1, 0xC2, 0xC3, 0xCA, 0xD4, 0x102, 0x131, ord("I")} | set(BASE.values()))
+
+
+def stroke_width(font):
+    px, _ = decode_glyph(font.glyphs[0x131])
+    return len({x for x, _ in px})
+
+
+def apply_28(font, stock):
+    """Capital tone-mark placement and the "?" hook for a 28px extended font.  `font` needs the stock letters (see
+    NEEDED) next to the Vietnamese glyphs; `stock` supplies any that are missing.  Returns the changed codepoints."""
+    import capital_marks as CM
+    added = [cp for cp in NEEDED if cp not in font.glyphs and cp in stock.glyphs]
+    for cp in added:
+        font.glyphs[cp] = stock.glyphs[cp]
+    w = min(stroke_width(font), 2)
+    changes = CM.restyle(font)
+    font.glyphs.update(changes)
+    hooks = replace_hooks(font, SHAPES[w], SHAPES3[w])
+    font.glyphs.update(hooks)
+    return added, set(changes) | set(hooks)
+
+
+def hook_ok_28(px):
+    """True when the topmost 8-connected component of a 28px hook glyph is exactly one of the "?" shapes, i.e. it
+    does not touch the circumflex / breve / letter below it, and nothing is above row 0."""
+    if not px or min(y for _, y in px) < 0:
+        return False
+    seed = min(p for p in px if p[1] == min(y for _, y in px))
+    comp, todo = set(), [seed]
+    while todo:
+        p = todo.pop()
+        if p in comp or p not in px:
+            continue
+        comp.add(p)
+        todo += [(p[0] + dx, p[1] + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)]
+    x0, y0, _, _ = bb(comp)
+    norm = shift(comp, -x0, -y0)
+    return any(norm == s for s in list(SHAPES.values()) + list(SHAPES3.values()))

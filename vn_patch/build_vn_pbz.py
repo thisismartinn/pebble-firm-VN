@@ -16,6 +16,7 @@ import argparse, binascii, contextlib, io, json, os, struct, sys, time, zipfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pbfmerge import Pbf, decode_glyph, encode_glyph  # noqa: E402
 import hook_style  # noqa: E402
+import hook_shape  # noqa: E402
 
 FIRMWARE, RESPACK = "tintin_fw.bin", "system_resources.pbpack"
 LANG_BASE = 0x100C                    # language packs: 256-entry table, not the system pack's 512
@@ -277,6 +278,8 @@ def main():
             changes = hook_style.restyle(base)
             base.glyphs.update(changes)
             restyled = len(changes)
+            if base.max_height == 28:
+                restyled += len(hook_shape.apply_28(base, base)[1])
         out = base.serialize()
         assert Pbf(out).glyphs.keys() == base.glyphs.keys()
         print("system resource %3d (h%2d): +%d glyphs, %d replaced%s%s, %d -> %d bytes"

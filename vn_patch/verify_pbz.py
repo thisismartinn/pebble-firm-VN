@@ -73,6 +73,7 @@ def main():
 
     from build_vn_pbz import read_emoji_list
     import hook_style
+    import hook_shape
     partial = info.get("only_codepoints")
     vn_chars = [chr(c) for c in partial] if partial else list(VN)
     groups, names = read_emoji_list(a.emoji_list)
@@ -98,7 +99,10 @@ def main():
             for cp in hook_style.HOOK_GLYPHS:
                 px, _ = decode_glyph(lookup(d, cp))
                 top = min(y for _, y in px); bar = max(x for x, y in px if y == top)
-                check(not any(y == top + 1 and x > bar for x, y in px), "resource %d: %s has no pixel sticking out of its hook" % (rid, chr(cp)))
+                if d[1] == 28:
+                    check(hook_shape.hook_ok_28(px), "resource %d: %s has the isolated 28px \"?\" hook" % (rid, chr(cp)))
+                else:
+                    check(not any(y == top + 1 and x > bar for x, y in px), "resource %d: %s has no pixel sticking out of its hook" % (rid, chr(cp)))
         if d[1] in (14, 18, 24, 28) and not partial:
             for cp, stem in ((0x1EC9, 0x131), (0x1EC8, ord("I"))):
                 sp, _ = decode_glyph(lookup(d, stem)); gp, _ = decode_glyph(lookup(d, cp))

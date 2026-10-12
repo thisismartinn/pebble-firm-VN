@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pbfmerge import Pbf, decode_glyph, encode_glyph
 from build_vn_pbz import find_pairs, repair_dot_below_y, separate_dot_below_y, repair_hook_i, load_font
 import hook_style
+import hook_shape
 
 BASE = 0x100C
 SLOT_36, SLOT_36B = 10, 11                       # 1-based resource numbers
@@ -83,6 +84,10 @@ def main():
         changes = hook_style.restyle(font)
         font.glyphs.update(changes)
         fixed_hook = fixed_hook or bool(changes)
+        if font.max_height == 28:
+            more, ch28 = hook_shape.apply_28(font, base)
+            refs = refs + tuple(more)
+            fixed_hook = fixed_hook or bool(ch28)
         for ref in refs:
             if ref not in ext.glyphs:                            # not part of the pack
                 del font.glyphs[ref]
