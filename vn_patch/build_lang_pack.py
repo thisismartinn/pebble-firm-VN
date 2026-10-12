@@ -13,7 +13,8 @@ import argparse, io, os, struct, sys, zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pbfmerge import Pbf, decode_glyph, encode_glyph
-from build_vn_pbz import find_pairs, repair_dot_below_y, load_font
+from build_vn_pbz import find_pairs, repair_dot_below_y, repair_hook_i, load_font
+import hook_style
 
 BASE = 0x100C
 SLOT_36, SLOT_36B = 10, 11                       # 1-based resource numbers
@@ -73,19 +74,28 @@ def main():
             fixed_i = True
         else:
             fixed_i = False
-        font.glyphs[ord("y")] = base.glyphs[ord("y")]            # reference only, removed again below
+        refs = (ord("y"), 0x131, ord("I"), ord("a"))              # reference letters, removed again below
+        for ref in refs:
+            font.glyphs[ref] = base.glyphs[ref]
         fixed = repair_dot_below_y(font)
-        del font.glyphs[ord("y")]
-        if fixed or fixed_i:
+        fixed_hook = bool(repair_hook_i(font))
+        changes = hook_style.restyle(font)
+        font.glyphs.update(changes)
+        fixed_hook = fixed_hook or bool(changes)
+        for ref in refs:
+            if ref not in ext.glyphs:                            # not part of the pack
+                del font.glyphs[ref]
+        if fixed or fixed_i or fixed_hook:
             for j in range(len(res)):                           # the pack repeats some fonts in other slots
                 if res[j] == res[i]:
                     res[j] = font.serialize()
             print("slot %2d (h%2d): %s" % (i + 1, font.max_height,
-                  ", ".join(x for x, f in (("U+1EF5 repaired", fixed), ("U+0128 restored from stock", fixed_i)) if f)))
+                  ", ".join(x for x, f in (("U+1EF5 repaired", fixed), ("U+0128 restored from stock", fixed_i), ("hooks restyled", fixed_hook)) if f)))
 
     # 2) slots 10/11: 36px extension fonts
     template = Pbf(res[7])                                       # GOTHIC_28_EXTENDED: same flavour
-    wanted = sorted(cp for cp in template.glyphs if cp != template.wildcard)
+    # the 14-28px extensions have no Ă/ă (the stock fonts do); the stock 36 regular lacks them, so add them here
+    wanted = sorted({cp for cp in template.glyphs if cp != template.wildcard} | {0x102, 0x103})
     larges = {}
     for j, r in enumerate(sys_res):
         f = load_font(r)
