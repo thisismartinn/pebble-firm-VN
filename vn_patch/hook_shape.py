@@ -50,6 +50,10 @@ def replace_hooks(font, shape):
         sx0, sy0, sx1, sy1 = bb(shape)
         left = (ox0 + ox1) // 2 - (sx1 - sx0) // 2
         new = shift(shape, left - sx0, oy1 - sy1)
+        # on a circumflex / breve the hook must not touch the mark below it: keep one blank row between them
+        while any((x + dx, y + 1) in base for x, y in new for dx in (-1, 0, 1)) or \
+                any((x, y) in base for x, y in new):
+            new = shift(new, 0, -1)
         out[cp] = encode_glyph(base | new, adv)
     for cp, stem in H.I_HOOK.items():
         sp, sadv = decode_glyph(font.glyphs[stem]); gp, gadv = decode_glyph(font.glyphs[cp])
