@@ -94,7 +94,8 @@ def main():
 
     # 2) slots 10/11: 36px extension fonts
     template = Pbf(res[7])                                       # GOTHIC_28_EXTENDED: same flavour
-    wanted = sorted(cp for cp in template.glyphs if cp != template.wildcard)
+    # the 14-28px extensions have no Ă/ă (the stock fonts do); the stock 36 regular lacks them, so add them here
+    wanted = sorted({cp for cp in template.glyphs if cp != template.wildcard} | {0x102, 0x103})
     larges = {}
     for j, r in enumerate(sys_res):
         f = load_font(r)
