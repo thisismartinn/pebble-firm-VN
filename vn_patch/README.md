@@ -63,15 +63,22 @@ bar is removed from all 22 hook-above glyphs; lowercase ỉ loses the two pixels
 top and bottom rows; capital Ỉ gets the font's own revised hook, centred on the stem and moved 1 px right.
 Both builders apply it.
 
-## Language pack v18
+## Language pack v19
 
-`build_lang_pack.py` turns the v16 pack into `dist/vi-VN_v18.pbl` (v17 was the first revision of this pack):
-it repairs the truncated U+1EF5 and the mis-weighted, off-centre ỉ/Ỉ in the 14-28px fonts, restores the
+`build_lang_pack.py` turns the v16 pack into `dist/vi-VN_v19.pbl` (v17 and v18 were earlier revisions):
+it repairs the truncated U+1EF5 (and keeps a blank row between the tail of the y and its dot at every size) and the mis-weighted, off-centre ỉ/Ỉ in the 14-28px fonts, restores the
 stock capital Ĩ, applies the hook style, and puts real 36px fonts (with Ă/ă added) into slots 10/11
 (GOTHIC_36_EXTENDED / _BOLD_EXTENDED in Core Devices' 21-slot layout; v16 had 28px fonts there). A pack cannot
 carry 09px, there is no slot for it. Slots 1-9 are identical on both layouts, so one pack serves Core Devices
 watches and current Pebbles; slots 10/11 feed Bitham fonts on older firmware, as in v16. `verify_lang_pack.py`
 checks it.
+
+### 36px composition rules (`compose_vn.py`)
+
+- Capital Â Ê Ô with a grave, acute or hook: the tone mark goes above and to the right of the circumflex apex, the circumflex stays intact (it used to be tucked into it and merged into a wavy shape). Bold Ă with a tone mark centres it above the breve.
+- Bold tilde on a capital circumflex or breve (Ẵ Ẫ Ễ Ỗ): the 6-row bold tilde has no room above the mark, so it is squeezed to 5 rows and stacked with a one-row gap, like the regular.
+- Ĩ ĩ at 36 regular use the font's own 10-wide tilde; the letter widens to fit.
+- Lowercase at 36 is unchanged.
 
 ## Extra emoji
 
@@ -109,7 +116,7 @@ python3 build_vn_pbz.py --skip-large 09 ... Pebble-4.4.3-rbl-spalding.pbz  dist/
 # Pebble 2: only Đ đ Ơ ơ Ư ư in the base fonts, the rest comes from the language pack
 python3 build_vn_pbz.py --no-large --only-codepoints 110,111,1A0,1A1,1AF,1B0 ... Pebble-4.4.3-rbl-silk.pbz  dist/Pebble-4.4.3-rbl-vn-silk.pbz
 # language pack
-python3 build_lang_pack.py --patcher-dir legacy-firmware-patcher --pbl vi_VN_v16_1.pbl --stock-pbz Pebble-4.4.3-rbl-spalding.pbz dist/vi-VN_v18.pbl
+python3 build_lang_pack.py --patcher-dir legacy-firmware-patcher --pbl vi_VN_v16_1.pbl --stock-pbz Pebble-4.4.3-rbl-spalding.pbz dist/vi-VN_v19.pbl
 ```
 
 `hook_style.py` holds the revised hook-above style (see its docstring); both builders apply it.

@@ -13,7 +13,7 @@ import argparse, io, os, struct, sys, zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pbfmerge import Pbf, decode_glyph, encode_glyph
-from build_vn_pbz import find_pairs, repair_dot_below_y, repair_hook_i, load_font
+from build_vn_pbz import find_pairs, repair_dot_below_y, separate_dot_below_y, repair_hook_i, load_font
 import hook_style
 
 BASE = 0x100C
@@ -78,6 +78,7 @@ def main():
         for ref in refs:
             font.glyphs[ref] = base.glyphs[ref]
         fixed = repair_dot_below_y(font)
+        fixed = separate_dot_below_y(font) or fixed
         fixed_hook = bool(repair_hook_i(font))
         changes = hook_style.restyle(font)
         font.glyphs.update(changes)

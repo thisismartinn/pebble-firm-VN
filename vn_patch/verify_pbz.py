@@ -109,6 +109,10 @@ def main():
         if not partial:
             y, _ = decode_glyph(lookup(d, ord("y"))); dy, _ = decode_glyph(lookup(d, 0x1EF5))
             check(y <= dy, "resource %d: U+1EF5 contains the full letter y" % rid)
+            if d[1] in (14, 18, 24, 28):
+                bottom = max(r for _, r in y)
+                dot = [r for _, r in dy if r > bottom]
+                check(dot and min(dot) >= bottom + 2, "resource %d: the dot of ỵ is separated from the tail by a blank row" % rid)
         check(not missing and kept and not lost,
               "resource %d (h%d): all %d Vietnamese chars resolve, nothing lost" % (rid, d[1], len(vn_chars)))
     print("\nALL CHECKS PASSED" if ok else "\nFAILURES")

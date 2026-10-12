@@ -69,7 +69,7 @@ DRAWN = {
 
 # tilde for the narrow letters i/I (the font's own tilde is wider than their stem)
 NARROW_TILDE = {
-    "36": bitmap(["..##..##", ".#######", "#######.", "##.###.."]),   # the font's own tilde, two columns narrower
+    "36": bitmap(["..###...##", ".#########", "#########.", "##..####.."]),   # the font's own 10-wide tilde (the letter widens to fit)
     "36b": bitmap([".###..##", ".###..##", "########", "########", "##..###.", "##..###."]),
 }
 
@@ -137,9 +137,9 @@ class Composer:
             return base | shift(m, tx0 - 1 - mm[2], top)
         return base | shift(m, tx1 + 1 - mm[0], top)
 
-    # bold tilde over a capital circumflex/breve: "A" = the font's 6-row tilde touching the mark, "B" = squeezed to 5
+    # bold tilde over a capital circumflex/breve: "A" = the font's 6-row tilde touching the mark, "B" (used) = squeezed to 5
     # rows with a one-row gap (like the regular)
-    BOLD_TILDE_VARIANT = "A"
+    BOLD_TILDE_VARIANT = "B"
 
     def stack36(self, base, tone, mark_kind):
         """Capitals at 36 with a circumflex or breve: keep the own mark intact and put the tone mark where it

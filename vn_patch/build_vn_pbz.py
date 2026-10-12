@@ -73,6 +73,19 @@ DOT_BELOW = {"a": 0x1EA1, "A": 0x1EA0, "e": 0x1EB9, "E": 0x1EB8, "o": 0x1ECD,
              "O": 0x1ECC, "u": 0x1EE5, "U": 0x1EE4}   # y/Y are left out: the pack redraws the tail
 
 
+def separate_dot_below_y(font):
+    """Keep a one-row gap between the tail of the y and the dot of U+1EF5 (ỵ).  At 18, 24, 28 and 28 bold the
+    pack's dot touches the tail, which makes the tail look longer; the other sizes already have the gap."""
+    y, _ = decode_glyph(font.glyphs[ord("y")])
+    cur, adv = decode_glyph(font.glyphs[0x1EF5])
+    bottom = max(r for _, r in y)
+    dot = {p for p in cur if p[1] > bottom}
+    if dot and min(r for _, r in dot) == bottom + 1:
+        font.glyphs[0x1EF5] = encode_glyph((cur - dot) | {(x, r + 1) for x, r in dot}, adv)
+        return True
+    return False
+
+
 def repair_hook_i(font):
     """The pack's U+1EC9 / U+1EC8 (i / I with hook above) have the wrong stem in most sizes: 2 px where
     the regular fonts use 1 px (and 2 px where bold 28 uses 3), and the stem sits one pixel right of
@@ -259,6 +272,7 @@ def main():
         else:
             added, replaced = base.merge(ext, PREFER_PACK)
             fixed = repair_dot_below_y(base)
+            separate_dot_below_y(base)
             repair_hook_i(base)
             changes = hook_style.restyle(base)
             base.glyphs.update(changes)
