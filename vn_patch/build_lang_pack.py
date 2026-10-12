@@ -13,7 +13,7 @@ import argparse, io, os, struct, sys, zipfile
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pbfmerge import Pbf, decode_glyph, encode_glyph
-from build_vn_pbz import find_pairs, repair_dot_below_y, load_font
+from build_vn_pbz import find_pairs, repair_dot_below_y, repair_hook_i, load_font
 
 BASE = 0x100C
 SLOT_36, SLOT_36B = 10, 11                       # 1-based resource numbers
@@ -74,14 +74,19 @@ def main():
         else:
             fixed_i = False
         font.glyphs[ord("y")] = base.glyphs[ord("y")]            # reference only, removed again below
+        font.glyphs[0x131], font.glyphs[ord("I")] = base.glyphs[0x131], base.glyphs[ord("I")]
         fixed = repair_dot_below_y(font)
+        fixed_hook = bool(repair_hook_i(font))
         del font.glyphs[ord("y")]
-        if fixed or fixed_i:
+        for ref in (0x131, ord("I")):
+            if ref not in ext.glyphs:                            # reference letters only, not part of the pack
+                del font.glyphs[ref]
+        if fixed or fixed_i or fixed_hook:
             for j in range(len(res)):                           # the pack repeats some fonts in other slots
                 if res[j] == res[i]:
                     res[j] = font.serialize()
             print("slot %2d (h%2d): %s" % (i + 1, font.max_height,
-                  ", ".join(x for x, f in (("U+1EF5 repaired", fixed), ("U+0128 restored from stock", fixed_i)) if f)))
+                  ", ".join(x for x, f in (("U+1EF5 repaired", fixed), ("U+0128 restored from stock", fixed_i), ("U+1EC8/1EC9 re-centred", fixed_hook)) if f)))
 
     # 2) slots 10/11: 36px extension fonts
     template = Pbf(res[7])                                       # GOTHIC_28_EXTENDED: same flavour

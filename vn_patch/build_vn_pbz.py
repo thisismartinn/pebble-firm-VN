@@ -72,6 +72,28 @@ DOT_BELOW = {"a": 0x1EA1, "A": 0x1EA0, "e": 0x1EB9, "E": 0x1EB8, "o": 0x1ECD,
              "O": 0x1ECC, "u": 0x1EE5, "U": 0x1EE4}   # y/Y are left out: the pack redraws the tail
 
 
+def repair_hook_i(font):
+    """The pack's U+1EC9 / U+1EC8 (i / I with hook above) have the wrong stem in most sizes: 2 px where
+    the regular fonts use 1 px (and 2 px where bold 28 uses 3), and the stem sits one pixel right of
+    the other i-family letters.  Rebuild them from the font's own stem and the pack's hook, centred."""
+    fixed = []
+    for cp, stem in ((0x1EC9, 0x131), (0x1EC8, ord("I"))):
+        sp, adv = decode_glyph(font.glyphs[stem])
+        gp, gadv = decode_glyph(font.glyphs[cp])
+        top, bottom = min(y for _, y in sp), max(y for _, y in sp)
+        hook = {p for p in gp if p[1] < top}
+        body = {p for p in gp if p[1] >= top}
+        if not hook or not body:
+            continue
+        centre = lambda px: (min(x for x, _ in px) + max(x for x, _ in px)) // 2
+        moved = {(x + centre(sp) - centre(body), y) for x, y in hook}
+        new = sp | moved
+        if new != gp:
+            font.glyphs[cp] = encode_glyph(new, max(adv, gadv))
+            fixed.append(cp)
+    return fixed
+
+
 def matches(base, ext):
     for ch, cp in DOT_BELOW.items():
         if ord(ch) not in base.glyphs or cp not in ext.glyphs:
@@ -228,6 +250,7 @@ def main():
         base = Pbf(sys_res[j])
         added, replaced = base.merge(ext, PREFER_PACK)
         fixed = repair_dot_below_y(base)
+        repair_hook_i(base)
         out = base.serialize()
         assert Pbf(out).glyphs.keys() == base.glyphs.keys()
         print("system resource %3d (h%2d): +%d glyphs, %d replaced%s, %d -> %d bytes"

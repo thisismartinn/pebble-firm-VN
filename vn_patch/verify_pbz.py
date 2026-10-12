@@ -92,6 +92,13 @@ def main():
                 if lookup(o, cp) is not None and lookup(d, cp) is None]
         if d[1] in (14, 18, 24, 28):
             check(lookup(d, 0x128) == lookup(o, 0x128), "resource %d: Ĩ is the stock glyph (complete tilde)" % rid)
+        if d[1] in (14, 18, 24, 28):
+            for cp, stem in ((0x1EC9, 0x131), (0x1EC8, ord("I"))):
+                sp, _ = decode_glyph(lookup(d, stem)); gp, _ = decode_glyph(lookup(d, cp))
+                top = min(y for _, y in sp)
+                body = {p for p in gp if p[1] >= top}
+                ext = lambda px: (min(x for x, _ in px), max(x for x, _ in px))
+                check(ext(body) == ext(sp), "resource %d: %s has the same stem as its base letter" % (rid, chr(cp)))
         y, _ = decode_glyph(lookup(d, ord("y"))); dy, _ = decode_glyph(lookup(d, 0x1EF5))
         check(y <= dy, "resource %d: U+1EF5 contains the full letter y" % rid)
         check(not missing and kept and not lost,
