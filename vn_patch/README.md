@@ -36,28 +36,42 @@ The Time / Time Steel mapping follows Rebble's board names (the stock bundles ar
 Check the hardware revision on the watch (Settings > System > Information) before flashing; the
 bundles differ only in the firmware image, the fonts are identical.
 
-## What each build contains
+## What each build contains (Rebble 4.4.3-rbl)
 
-Space in the 512 KiB resource bank is the limit, so `build_vn_pbz.py` fits things in priority order
-and keeps `--margin` (default 1 KiB) free: Vietnamese 14-28px (always) > Gothic 36 bold > Gothic 09 >
-Gothic 36 > coffee > extra emoji in the order of `emoji_list.txt`. a `.pbz.json` file written next to each
-bundle records what it got. The Time / Time Steel bundles were built with `--skip-large 36` to leave room for more emoji.
+Space in the 512 KiB resource bank is the limit, so `build_vn_pbz.py` fits things in priority order and keeps
+`--margin` (default 1 KiB) free: Vietnamese 14-28px (always) > Gothic 36 bold > Gothic 09 > Gothic 36 > coffee >
+extra emoji in the order of `emoji_list.txt`. A `.pbz.json` file written next to each bundle records what it got.
 
-| Build | Vietnamese sizes | Extra emoji |
+| Build | Vietnamese in the base fonts | Extra emoji |
 |---|---|---|
-| Time / Time Steel | 09, 14, 18, 24, 28, 36 bold (36 regular skipped with `--skip-large 36`) | 37 (of 45) |
-| Time Round | 09, 14, 18, 24, 28, 36 bold (36 regular does not fit) | 19 |
+| Time, Time Steel | 14-28, 36 bold (built with `--skip-large 36 --skip-large 09`) | 31 of 52 |
+| Time Round | 14-28, 36 bold (built with `--skip-large 09`; 36 regular does not fit) | 14 of 52 |
+| Pebble 2 | only Đ đ Ơ ơ Ư ư (`--only-codepoints`); the rest comes from the language pack | 35 of 52 |
 
-The glyphs for 09 / 36 / 36 bold are drawn by `compose_vn.py` from the font's own letters and marks
-(`preview_vn.py` renders review sheets). The stock bold 36 Đ/đ and Ĩ/ĩ were wrong and are replaced.
+Why Pebble 2 can lean on the pack: the firmware draws codepoints up to U+02AF from the base font and the ones
+above it can come from the pack's extension fonts, so the letters at or below U+02AF that the stock fonts lack
+(Đ đ Ơ ơ Ư ư) are the only ones the base fonts must carry.
 
-## Language pack v17
+The glyphs for 36 / 36 bold are drawn by `compose_vn.py` from the font's own letters and marks (`preview_vn.py`
+renders review sheets); the stock bold 36 Đ/đ and Ĩ/ĩ were wrong and are replaced. 09px is no longer built: the
+only user in the firmware is the bundled Golf app's fixed English labels.
 
-`build_lang_pack.py` turns the v16 pack into `dist/vi-VN_v18.pbl` (v17 was the first version of this pack): it repairs the truncated U+1EF5 in the
-14-28px fonts and puts real 36px fonts into slots 10/11 (GOTHIC_36_EXTENDED / _BOLD_EXTENDED in Core
-Devices' 21-slot layout; v16 had 28px fonts there). A pack cannot carry 09px, there is no slot for it.
-The slot order differs on older firmware (4.4.2's slots 10/11 are Bitham fonts), and the 4.4.2-rbl-vn builds
-do not need the pack because the glyphs are in the base fonts. `verify_lang_pack.py` checks it.
+### Hook-above style
+
+`hook_style.py` restyles the hook-above mark in the 14-28px fonts: the pixel that sticks out right of the top
+bar is removed from all 22 hook-above glyphs; lowercase ỉ loses the two pixels at the left ends of its old hook's
+top and bottom rows; capital Ỉ gets the font's own revised hook, centred on the stem and moved 1 px right.
+Both builders apply it.
+
+## Language pack v18
+
+`build_lang_pack.py` turns the v16 pack into `dist/vi-VN_v18.pbl` (v17 was the first revision of this pack):
+it repairs the truncated U+1EF5 and the mis-weighted, off-centre ỉ/Ỉ in the 14-28px fonts, restores the
+stock capital Ĩ, applies the hook style, and puts real 36px fonts (with Ă/ă added) into slots 10/11
+(GOTHIC_36_EXTENDED / _BOLD_EXTENDED in Core Devices' 21-slot layout; v16 had 28px fonts there). A pack cannot
+carry 09px, there is no slot for it. Slots 1-9 are identical on both layouts, so one pack serves Core Devices
+watches and current Pebbles; slots 10/11 feed Bitham fonts on older firmware, as in v16. `verify_lang_pack.py`
+checks it.
 
 ## Extra emoji
 
@@ -73,13 +87,16 @@ Not possible without changing firmware code: anything outside U+E000-E537 / U+1F
 
 ## Notes
 
-- Glyphs present in both (Đ đ Ĩ ĩ Ũ ũ) take the pack's version. Stock Gothic 18/28 draw Đ as D with a bar above.
-- The pack's U+1EF5 (ỵ) is truncated in the 18, 24 and 28 (regular and bold 28) fonts; the builder repairs it
-  from the stock `y` plus the pack's dot, and says so when it does. Worth fixing in the pack itself.
-- Silk is not built: the grown pack (535,157 bytes) does not fit its 512 KiB resource bank. The builder refuses.
+- Glyphs present in both the stock fonts and the pack: Đ đ ĩ Ũ ũ take the pack's version (stock Gothic 18/28 draw
+  Đ as D with a bar above); capital Ĩ keeps the stock glyph because the pack's has its tilde clipped to one row
+  in five of the eight sizes.
+- Defects in the pack that the builders repair (worth fixing in the pack itself): U+1EF5 (ỵ) is truncated in the
+  18, 24 and 28 fonts; ỉ/Ỉ have the wrong stem weight and sit one pixel right of ì/í/ĩ.
+- A full Vietnamese Silk (Pebble 2) build does not fit its 512 KiB bank (about 13 KB over), which is why Pebble 2
+  gets the partial build above; the builder refuses to write a pack that does not fit.
 - The pack contains no translated strings; the UI stays English.
-- Checked on the files only (CRCs, resource diffs, hash lookup of every Vietnamese letter). Not yet run on a watch.
-- Space left in the resource bank: about 1.1-1.2 KB on every build (by design, see above); `build_vn_pbz.py` refuses to build if the pack does not fit.
+- Every file is checked by `verify_pbz.py` / `verify_lang_pack.py` (CRCs, resource diffs, hash lookup of every Vietnamese letter, hook shapes). The 4.4.3 Time/Time Steel builds boot on hardware; on-device checks of 36px sizing and the new hook shapes are still pending.
+- About 1 KB of the resource bank is left free on every build (by design, see above).
 
 ## Reproducing the current builds (Rebble 4.4.3-rbl)
 
