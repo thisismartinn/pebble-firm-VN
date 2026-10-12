@@ -1,5 +1,9 @@
 # Vietnamese build of the Rebble 4.4.x firmware
 
+**The firmware bundles (`.pbz`) and language packs (`.pbl`) are not stored in this repository.** The repo's
+`.gitignore` ignores `dist/`, which is where the scripts write their output, and the files are published as
+release assets instead. Only the tooling lives here; the commands below regenerate every file.
+
 Rebble's `4.4.x-rbl` firmware for Pebble Time, Time Steel and Time Round is a binary patch of
 Pebble's closed 4.3 firmware (see `pebble-dev/legacy-firmware-patcher`), so there is no source to
 merge the Core Devices PRs into. What those PRs mean for Vietnamese is font data, and that can be
@@ -23,9 +27,10 @@ Stock inputs: `https://github.com/pebble-dev/legacy-firmware-patcher/releases/do
 
 | Watch | File | `hwrev` in the bundle |
 |---|---|---|
-| Pebble Time | `dist/Pebble-4.4.2-rbl-vn-snowy_dvt.pbz` | `snowy_dvt` |
-| Pebble Time Steel | `dist/Pebble-4.4.2-rbl-vn-snowy_s3.pbz` | `snowy_s3` |
-| Pebble Time Round | `dist/Pebble-4.4.2-rbl-vn-spalding.pbz` | `spalding` |
+| Pebble Time | `Pebble-4.4.x-rbl-vn-snowy_dvt.pbz` | `snowy_dvt` |
+| Pebble Time Steel | `Pebble-4.4.x-rbl-vn-snowy_s3.pbz` | `snowy_s3` |
+| Pebble Time Round | `Pebble-4.4.x-rbl-vn-spalding.pbz` | `spalding` |
+| Pebble 2 | `Pebble-4.4.x-rbl-vn-silk.pbz` (4.4.3 only) | `silk` |
 
 The Time / Time Steel mapping follows Rebble's board names (the stock bundles are named the same way).
 Check the hardware revision on the watch (Settings > System > Information) before flashing; the
@@ -35,8 +40,8 @@ bundles differ only in the firmware image, the fonts are identical.
 
 Space in the 512 KiB resource bank is the limit, so `build_vn_pbz.py` fits things in priority order
 and keeps `--margin` (default 1 KiB) free: Vietnamese 14-28px (always) > Gothic 36 bold > Gothic 09 >
-Gothic 36 > coffee > extra emoji in the order of `emoji_list.txt`. `dist/*.pbz.json` records what each
-build got. The Time / Time Steel bundles were built with `--skip-large 36` to leave room for more emoji.
+Gothic 36 > coffee > extra emoji in the order of `emoji_list.txt`. a `.pbz.json` file written next to each
+bundle records what it got. The Time / Time Steel bundles were built with `--skip-large 36` to leave room for more emoji.
 
 | Build | Vietnamese sizes | Extra emoji |
 |---|---|---|
@@ -48,7 +53,7 @@ The glyphs for 09 / 36 / 36 bold are drawn by `compose_vn.py` from the font's ow
 
 ## Language pack v17
 
-`build_lang_pack.py` turns the v16 pack into `dist/vi_VN-v17.pbl`: it repairs the truncated U+1EF5 in the
+`build_lang_pack.py` turns the v16 pack into `dist/vi-VN_v18.pbl` (v17 was the first version of this pack): it repairs the truncated U+1EF5 in the
 14-28px fonts and puts real 36px fonts into slots 10/11 (GOTHIC_36_EXTENDED / _BOLD_EXTENDED in Core
 Devices' 21-slot layout; v16 had 28px fonts there). A pack cannot carry 09px, there is no slot for it.
 The slot order differs on older firmware (4.4.2's slots 10/11 are Bitham fonts), and the 4.4.2-rbl-vn builds
@@ -75,3 +80,19 @@ Not possible without changing firmware code: anything outside U+E000-E537 / U+1F
 - The pack contains no translated strings; the UI stays English.
 - Checked on the files only (CRCs, resource diffs, hash lookup of every Vietnamese letter). Not yet run on a watch.
 - Space left in the resource bank: about 1.1-1.2 KB on every build (by design, see above); `build_vn_pbz.py` refuses to build if the pack does not fit.
+
+## Reproducing the current builds (Rebble 4.4.3-rbl)
+
+```
+# Time and Time Steel
+python3 build_vn_pbz.py --skip-large 36 --skip-large 09 --patcher-dir legacy-firmware-patcher --pbl vi_VN_v16_1.pbl \
+    --version v4.4.3-rbl-vn  Pebble-4.4.3-rbl-snowy_s3.pbz  dist/Pebble-4.4.3-rbl-vn-snowy_s3.pbz
+# Time Round
+python3 build_vn_pbz.py --skip-large 09 ... Pebble-4.4.3-rbl-spalding.pbz  dist/Pebble-4.4.3-rbl-vn-spalding.pbz
+# Pebble 2: only Đ đ Ơ ơ Ư ư in the base fonts, the rest comes from the language pack
+python3 build_vn_pbz.py --no-large --only-codepoints 110,111,1A0,1A1,1AF,1B0 ... Pebble-4.4.3-rbl-silk.pbz  dist/Pebble-4.4.3-rbl-vn-silk.pbz
+# language pack
+python3 build_lang_pack.py --patcher-dir legacy-firmware-patcher --pbl vi_VN_v16_1.pbl --stock-pbz Pebble-4.4.3-rbl-spalding.pbz dist/vi-VN_v18.pbl
+```
+
+`hook_style.py` holds the revised hook-above style (see its docstring); both builders apply it.
