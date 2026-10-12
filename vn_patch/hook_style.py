@@ -7,7 +7,8 @@ The revised style drops that pixel:   ###        ###
                                        .#..       .#.
 It is applied to every glyph that carries the mark.  The pack's hook above i/I (ỉ, Ỉ) is a different,
 wider shape (`###. / ..## / .##.`); those two glyphs are rebuilt from the font's own stem and the
-revised hook, centred on the stem (Ỉ is then moved one pixel to the right).
+revised hook, centred on the stem (Ỉ is then moved one pixel to the right); ỉ only loses the two pixels at
+the left ends of its old hook's top and bottom rows.
 """
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -24,52 +25,63 @@ def shift(px, dx, dy):
 
 
 def revised(hook):
-    """hook: set of pixels of the old-style mark -> revised mark (drops what sticks out right of the top bar)."""
+    """hook: set of pixels of an old-style mark -> revised mark (drops what sticks out right of the top bar)."""
     top = min(y for _, y in hook)
     bar_right = max(x for x, y in hook if y == top)
     return {(x, y) for x, y in hook if y == top or x <= bar_right}
 
 
-def own_hook(font):
-    """The mark as drawn above `a` in this font: the pixels of ả above the top of a."""
-    a, _ = decode_glyph(font.glyphs[ord("a")])
-    ar, _ = decode_glyph(font.glyphs[0x1EA3])
-    top = min(y for _, y in a)
-    return {p for p in ar if p[1] < top}
+def drop_protrusion(px):
+    """Per glyph: the mark is the topmost thing in these glyphs, so its bar is the top row; remove the pixels of
+    the second row that stick out to the right of that bar.  (Lowercase ả ẻ ỏ ủ ỷ already have the revised
+    shape at 14 regular; capitals and hooks combined with a circumflex, breve or horn do not.)"""
+    top = min(y for _, y in px)
+    bar_right = max(x for x, y in px if y == top)
+    return {(x, y) for x, y in px if not (y == top + 1 and x > bar_right)}
 
 
-def restyle(font, i_shift=(0, 1)):
-    """-> {codepoint: record} with the new hook; `i_shift` = (dx for ỉ, dx for Ỉ)."""
-    old = own_hook(font)
-    new = revised(old)
-    x0 = min(x for x, _ in old); y0 = min(y for _, y in old)
-    rel_old = {(x - x0, y - y0) for x, y in old}
-    drop_rel = rel_old - {(x - x0, y - y0) for x, y in new}
+def reference_hook(font, upper=False):
+    """The revised mark as the font draws it above ả (or Ả): (pixels above the letter, relative to its top-left)."""
+    base = decode_glyph(font.glyphs[ord("A" if upper else "a")])[0]
+    full = decode_glyph(font.glyphs[0x1EA2 if upper else 0x1EA3])[0]
+    top = min(y for _, y in base)
+    hook = revised({p for p in full if p[1] < top})
+    x0, y0 = min(x for x, _ in hook), min(y for _, y in hook)
+    return {(x - x0, y - y0) for x, y in hook}
+
+
+def restyle(font, i_option="A", upper_i_shift=1):
+    """-> {codepoint: record} for the glyphs whose hook changes.
+
+    * every hook-above glyph loses the pixel sticking out right of the top bar,
+    * ỉ (i_option "A"): the two pixels at the left ends of the old hook's top and bottom rows are removed;
+      (i_option "B": the revised hook, centred on the stem),
+    * Ỉ: the revised hook, centred on the stem and then moved `upper_i_shift` pixels to the right.
+    """
     out = {}
     for cp in HOOK_GLYPHS:
         if cp not in font.glyphs:
             continue
         px, adv = decode_glyph(font.glyphs[cp])
-        # find where the old mark sits in this glyph (it is drawn identically everywhere)
-        hits = [(dx, dy) for dx in range(-3, 12) for dy in range(-3, 12)
-                if shift(rel_old, dx, dy) <= px and min(y for _, y in px) == dy + min(y for _, y in rel_old) or
-                (shift(rel_old, dx, dy) <= px and dy + 0 == min(y for _, y in px))]
-        hits = [h for h in hits if shift(rel_old, *h) <= px]
-        if not hits:
-            raise SystemExit("hook mark not found in U+%X" % cp)
-        dx, dy = min(hits, key=lambda h: h[1])                 # topmost placement
-        removed = shift(drop_rel, dx, dy)
-        out[cp] = encode_glyph(px - removed, adv)
+        new = drop_protrusion(px)
+        if new != px:
+            out[cp] = encode_glyph(new, adv)
     for cp, stem in I_HOOK.items():
         sp, sadv = decode_glyph(font.glyphs[stem])
         gp, gadv = decode_glyph(font.glyphs[cp])
         top = min(y for _, y in sp)
-        rows = sorted({y for _, y in gp if y < top})            # the three rows the old hook occupies
-        h_top = rows[0]
-        mark = shift({(x - x0, y - y0) for x, y in new}, 0, 0)  # revised mark, top-left at (0, 0)
+        hook = {p for p in gp if p[1] < top}
+        if cp == 0x1EC9 and i_option == "A":
+            hy, hb = min(y for _, y in hook), max(y for _, y in hook)
+            drop = {(min(x for x, y in hook if y == hy), hy), (min(x for x, y in hook if y == hb), hb)}
+            out[cp] = encode_glyph(gp - drop, gadv)
+            continue
+        mark = revised(hook)
+        x0, y0 = min(x for x, _ in mark), min(y for _, y in mark)
+        mark = {(x - x0, y - y0) for x, y in mark}
         centre = (min(x for x, _ in sp) + max(x for x, _ in sp)) // 2
         bar_w = max(x for x, y in mark if y == 0) + 1
-        left = centre - bar_w // 2 + (i_shift[1] if cp == 0x1EC8 else i_shift[0])
-        px = sp | shift(mark, left, h_top)
+        left = centre - bar_w // 2 + (upper_i_shift if cp == 0x1EC8 else 0)
+        px = sp | shift(mark, left, min(y for _, y in hook))
         out[cp] = encode_glyph(px, max(sadv, gadv, max(x for x, _ in px) + 1))
     return out
