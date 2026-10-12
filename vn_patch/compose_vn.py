@@ -69,7 +69,7 @@ DRAWN = {
 
 # tilde for the narrow letters i/I (the font's own tilde is wider than their stem)
 NARROW_TILDE = {
-    "36": bitmap([".###..#", "#######", "###..##", "#..##.."]),
+    "36": bitmap(["..##..##", ".#######", "#######.", "##.###.."]),   # the font's own tilde, two columns narrower
     "36b": bitmap([".###..##", ".###..##", "########", "########", "##..###.", "##..###."]),
 }
 
@@ -108,8 +108,12 @@ class Composer:
         m = self.marks[tone, upper]
         return shift(m, 0, -bbox(m)[1])
 
-    def stacked(self, base, tone, upper, own_mark):
+    def stacked(self, base, tone, upper, own_mark, mark_kind=None):
         """base pixels + tone mark above (stacked when there is room, beside the base's own mark otherwise)."""
+        if self.kind in ("36", "36b") and upper and mark_kind in ("circ", "breve"):
+            placed = self.stack36(base, tone, mark_kind)
+            if placed is not None:
+                return placed
         if self.kind == "09" and upper and own_mark:
             base = self.open_diamond(base)
         m = self.mark(tone, upper)
@@ -132,6 +136,37 @@ class Composer:
         if tone == "grave":
             return base | shift(m, tx0 - 1 - mm[2], top)
         return base | shift(m, tx1 + 1 - mm[0], top)
+
+    # bold tilde over a capital circumflex/breve: "A" = the font's 6-row tilde touching the mark, "B" = squeezed to 5
+    # rows with a one-row gap (like the regular)
+    BOLD_TILDE_VARIANT = "A"
+
+    def stack36(self, base, tone, mark_kind):
+        """Capitals at 36 with a circumflex or breve: keep the own mark intact and put the tone mark where it
+        reads clearly.  grave / acute / hook go above and to the right of the circumflex apex (breve: centred above);
+        tilde goes straight above (the regular font already did, the bold one had no room and landed on the mark)."""
+        cap_top = bbox(self.px("H"))[1]
+        own = {p for p in base if p[1] < cap_top - 1}
+        if not own:
+            return None
+        ox0, oy0, ox1, oy1 = bbox(own)
+        apex = {x for x, y in own if y == oy0}
+        m = self.mark(tone, True)
+        if self.kind == "36" and (tone == "tilde" or mark_kind == "breve"):
+            return None                                       # the regular font was already right
+        if tone == "tilde" and self.kind == "36b" and self.BOLD_TILDE_VARIANT == "B":
+            rows = sorted({y for _, y in m})
+            m = {(x, y - (1 if y > rows[1] else 0)) for x, y in m if y != rows[1]}   # drop one duplicated row
+        mm = bbox(m); mw = mm[2] - mm[0] + 1; mh = mm[3] - mm[1] + 1
+        cx = (min(apex) + max(apex)) // 2 if mark_kind == "circ" else (ox0 + ox1) // 2
+        if tone == "tilde" or mark_kind == "breve":
+            gap = 1 if (tone == "tilde" and self.BOLD_TILDE_VARIANT == "B") else 0
+            y = max(0, oy0 - mh - gap)
+            left = cx - mw // 2
+        else:
+            y = max(0, oy0 - mh)                              # bottom row touches the row above the apex
+            left = (max(apex) if tone == "grave" else max(apex) + 1)
+        return base | shift(m, left - mm[0], y - mm[1])
 
     @staticmethod
     def open_diamond(px):
@@ -222,7 +257,8 @@ class Composer:
                     out[cp] = (px, adv_i)
                     continue
                 else:
-                    px = self.stacked(base, tone, upper, own)
+                    mk = "circ" if ch in "âêôÂÊÔ" else "breve" if ch in "ăĂ" else "horn"
+                    px = self.stacked(base, tone, upper, own, mk)
                 out[cp] = (px, adv)
         return out
 
