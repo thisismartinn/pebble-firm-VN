@@ -21,7 +21,7 @@ python3 build_vn_pbz.py --patcher-dir legacy-firmware-patcher --pbl vi_VN.pbl \
 python3 verify_pbz.py --patcher-dir legacy-firmware-patcher  Pebble-4.4.2-rbl-spalding.pbz  dist/...
 ```
 
-Stock inputs: `https://github.com/pebble-dev/legacy-firmware-patcher/releases/download/rbl2-rc1/Pebble-4.4.2-rbl-{snowy_dvt,snowy_s3,spalding}.pbz`
+Stock inputs: `https://github.com/pebble-dev/legacy-firmware-patcher/releases/download/rbl2-rc1/Pebble-4.4.2-rbl-{snowy_dvt,snowy_s3,spalding}.pbz` or `https://binaries.rebble.io/fw/{snowy_s3,snowy_dvt,spalding,silk}/Pebble-4.4.3-rbl-{snowy_s3,snowy_dvt,spalding,silk}.pbz`
 
 ## Which file for which watch
 
